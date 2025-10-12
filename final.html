@@ -1,4 +1,5 @@
 <!-- trigger GitHub Pages build -->
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -8,6 +9,7 @@
   <meta name="robots" content="noindex, nofollow" />
   <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600;700&family=Playfair+Display:wght@600;800&display=swap" rel="stylesheet">
   <style>
+    
     :root {
       --pink: #ff9acb;
       --blue: #7bc9ff;
@@ -58,8 +60,33 @@
     .jasmine { position: fixed; top: -40px; font-size: 24px; filter: drop-shadow(0 2px 2px rgba(0,0,0,.18)); pointer-events: none; animation: fall linear var(--dur, 10s) forwards; }
     @keyframes fall { to { transform: translateY(var(--fallY, 120vh)) rotate(var(--spin)); opacity: .95; } }
 
-    .floating-stage { position: relative; height: 70vh; overflow: hidden; border-radius: 24px; }
-    .present { position: absolute; width: 180px; height: 180px; border-radius: 16px; background: var(--c, #7c3aed); box-shadow: 0 12px 26px rgba(0,0,0,.16); transform: translate(-50%, -50%); }
+    /* >>> Mobile-drag improvements (NEW) <<< */
+    .floating-stage {
+      position: relative;
+      height: 70vh;
+      overflow: hidden;
+      border-radius: 24px;
+      /* Prevent the page from scrolling while you drag inside the stage */
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+    .present {
+      position: absolute;
+      width: 180px; height: 180px;
+      border-radius: 16px; background: var(--c, #7c3aed);
+      box-shadow: 0 12px 26px rgba(0,0,0,.16);
+      transform: translate(-50%, -50%);
+      /* Make the entire box an easy drag target on phones */
+      touch-action: none;              /* was: manipulation */
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      cursor: grab;
+    }
+    .present.dragging { cursor: grabbing; }
+
     .present .ribbon-vert, .present .ribbon-horz { position: absolute; background: var(--ribbon); }
     .present .ribbon-vert { width: 14px; left: 50%; transform: translateX(-50%); top: 0; bottom: 0; }
     .present .ribbon-horz { height: 14px; top: 50%; transform: translateY(-50%); left: 0; right: 0; }
@@ -69,10 +96,6 @@
     .present.open .message { opacity: 1; transform: scale(1); }
     .float { animation: floaty var(--fDur) ease-in-out infinite; }
     @keyframes floaty { 0%,100% { transform: translate(-50%, calc(-50% + 0px)); } 50% { transform: translate(-50%, calc(-50% - 20px)); } }
-
-    /* 🎯 New: drag cursors */
-    .present { cursor: grab; }
-    .present.dragging { cursor: grabbing; }
 
     .confetti { position: fixed; width: 10px; height: 10px; background: #fff; top: var(--y); left: var(--x); transform: translate(-50%, -50%) rotate(var(--rot)); opacity: .95; border-radius: 2px; animation: confetti-fall var(--t) cubic-bezier(.2,.8,.2,1) forwards; }
     @keyframes confetti-fall { to { transform: translate(-50%, calc(-50% + 120vh)) rotate(calc(var(--rot) + 360deg)); opacity: .9; } }
@@ -169,7 +192,7 @@
       * { animation: none !important; transition: none !important; }
     }
     @media (pointer: coarse) {
-      .present { touch-action: manipulation; -webkit-tap-highlight-color: rgba(0,0,0,0.06); }
+      .present { /* keep drag responsive on touch */ }
       .video-card, .video-frame { cursor: pointer; }
       a, button { -webkit-touch-callout: none; }
     }
@@ -566,7 +589,7 @@
       setTimeout(startJasmine, shouldReduceEffects() ? 3000 : 5000);
     })();
 
-    /* 🎯 New: Pointer-based drag helper for presents */
+    /* 🎯 Improved: Pointer-based drag helper for presents (better on phones) */
     function makeDraggable(box, container) {
       let startX = 0, startY = 0, origLeft = 0, origTop = 0, dragging = false, lastPointerId = null;
 
@@ -574,6 +597,9 @@
 
       const onPointerMove = (e) => {
         if (!dragging) return;
+        // Prevent the page from scrolling while dragging
+        e.preventDefault();
+
         const rect = container.getBoundingClientRect();
 
         let newLeft = origLeft + (e.clientX - startX);
@@ -594,16 +620,23 @@
         if (!dragging) return;
         dragging = false;
         box.classList.remove('dragging');
+
+        // restore touch behavior on release
+        box.style.touchAction = 'none';
+
         try { box.releasePointerCapture(lastPointerId); } catch {}
         // Re-enable bobbing after drop (remove this next line if you want the box to stay still)
         if (!shouldReduceEffects()) box.classList.add('float');
 
-        window.removeEventListener('pointermove', onPointerMove);
-        window.removeEventListener('pointerup', onPointerUp);
-        window.removeEventListener('pointercancel', onPointerUp);
+        window.removeEventListener('pointermove', onPointerMove, { capture: false });
+        window.removeEventListener('pointerup', onPointerUp, { capture: false });
+        window.removeEventListener('pointercancel', onPointerUp, { capture: false });
       };
 
       box.addEventListener('pointerdown', (e) => {
+        // Make drag feel direct on touch
+        e.preventDefault();
+
         lastPointerId = e.pointerId;
         dragging = true;
         box.classList.add('dragging');
@@ -618,10 +651,15 @@
 
         box.style.zIndex = 9999;
 
+        // While dragging, completely hand control to the pointer (no native panning)
+        box.style.touchAction = 'none';
+
         try { box.setPointerCapture(lastPointerId); } catch {}
-        window.addEventListener('pointermove', onPointerMove, { passive: true });
-        window.addEventListener('pointerup', onPointerUp);
-        window.addEventListener('pointercancel', onPointerUp);
+
+        // Use passive:false so preventDefault works on touch
+        window.addEventListener('pointermove', onPointerMove, { passive: false });
+        window.addEventListener('pointerup', onPointerUp, { passive: false });
+        window.addEventListener('pointercancel', onPointerUp, { passive: false });
       });
     }
 
@@ -653,6 +691,8 @@
 
         // Click toggles open; also add confetti burst
         box.addEventListener('click', (e) => {
+          // Prevent accidental page scroll tap during drag
+          e.stopPropagation();
           box.classList.toggle('open');
           burst(e.clientX, e.clientY);
         });
@@ -667,7 +707,6 @@
         box.setAttribute('role','button');
         box.setAttribute('aria-pressed', 'false');
         box.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); box.click(); } });
-        box.style.touchAction = 'manipulation';
       }
 
       const drift = () => {
@@ -883,4 +922,3 @@
   </script>
 </body>
 </html>
-
