@@ -200,6 +200,10 @@
       body { line-height: 1.5; font-size: 16px; }
       section { padding: clamp(12px, 4vw, 20px); margin: 16px; }
     }
+
+    /* ========= NEW: Video 5 highlight styles ========= */
+    .video-card.highlight { outline: 3px solid #111827; outline-offset: 2px; }
+    .video-card.highlight .video-meta strong::after { content: " • featured"; font-weight: 600; opacity: .8; }
   </style>
 </head>
 <body>
@@ -350,7 +354,14 @@
       { title: "Week 2", poster: "media/posters.jpg", sources: [ { src: "media/Video2.mp4", type: "video/mp4" } ] },
       { title: "Week 3", poster: "media/posters.jpg", sources: [ { src: "media/Video3.mp4", type: "video/mp4" } ] },
       { title: "Week 4", poster: "media/posters.jpg", sources: [ { src: "media/Video4.mp4", type: "video/mp4" } ] },
-      { title: "Week 5", poster: "media/posters.jpg", sources: [ { src: "media/Video5.mp4", type: "video/mp4" } ] }
+      { 
+        title: "Video 5 (Special)",
+        poster: "media/video5-poster.jpg",
+        sources: [ { src: "media/Video5.mp4", type: "video/mp4" } ],
+        tracks: [
+          { src: "media/video5.vtt", srclang: "en", label: "English", default: true }
+        ]
+      }
     ];
     const MANANAY_VIDEO = { poster: "media/posters.jpg", sources: [ { src: "media/Mananay.mp4", type: "video/mp4" } ] };
     const BIRTHDAY_VIDEO = { poster: "media/posters.jpg", sources: [ { src: "media/birthday.mp4", type: "video/mp4" } ] };
@@ -753,7 +764,7 @@
 
     /* ===== Video helpers ===== */
     function renderVideoInto(container, cfg){
-      const frame = document.getElementById(container);
+      const frame = typeof container === 'string' ? document.getElementById(container) : container;
       if (!frame) return;
       const video = document.createElement('video');
       video.setAttribute('controls','');
@@ -767,10 +778,20 @@
         src.src = s.src; if (s.type) src.type = s.type;
         video.appendChild(src);
       });
+      // NEW: add caption tracks if present
+      (cfg.tracks || []).forEach(t=>{
+        const track = document.createElement('track');
+        track.kind = 'subtitles';
+        track.src = t.src; track.srclang = t.srclang; track.label = t.label;
+        if (t.default) track.default = true;
+        video.appendChild(track);
+      });
       video.appendChild(document.createTextNode("Sorry, your browser can’t play this video."));
+      frame.innerHTML = '';
       frame.appendChild(video);
     }
 
+    // ===== UPDATED: Placeholder aware of captions =====
     function makeVideoPlaceholder(containerId, cfg) {
       const frame = document.getElementById(containerId);
       if (!frame) return;
@@ -791,9 +812,18 @@
         video.setAttribute('preload','metadata');
         video.setAttribute('playsinline','');
         video.style.width = '100%'; video.style.height = '100%';
+
         (cfg.sources || []).forEach(s => {
           const src = document.createElement('source'); src.src = s.src; if (s.type) src.type = s.type; video.appendChild(src);
         });
+        (cfg.tracks || []).forEach(t=>{
+          const track = document.createElement('track');
+          track.kind = 'subtitles';
+          track.src = t.src; track.srclang = t.srclang; track.label = t.label;
+          if (t.default) track.default = true;
+          video.appendChild(track);
+        });
+
         frame.innerHTML = '';
         frame.appendChild(video);
         hookVideoToPauseBgm(video);
@@ -815,6 +845,7 @@
       });
     }
 
+    /* ======= UPDATED buildVideos with highlight + deep link ======= */
     (function buildVideos(){
       wireImage('youngPhoto', 'media/young.jpg');
       wireImage('nowPhoto',   'media/old.jpg');
@@ -823,20 +854,23 @@
       if (grid && Array.isArray(VIDEOS)) {
         VIDEOS.forEach((item, i) => {
           const card = document.createElement('div');
-          card.className = 'video-card';
+          card.className = 'video-card' + (i === 4 ? ' highlight' : '');
+          card.dataset.index = i;
+
           const frame = document.createElement('div');
           frame.className = 'video-frame';
+          frame.id = `video-frame-${i}`;
+
           const meta = document.createElement('div');
           meta.className = 'video-meta';
           meta.innerHTML = `<strong>${item.title || 'Video ' + (i+1)}</strong>`;
 
+          // Render path (placeholder on reduced devices; full video otherwise)
           if (shouldReduceEffects()) {
-            const placeholder = document.createElement('div');
-            placeholder.className = 'video-frame';
             card.appendChild(meta);
-            card.appendChild(placeholder);
+            card.appendChild(frame);
             grid.appendChild(card);
-            makeVideoPlaceholder(placeholder.id = `placeholder-${i}`, item);
+            makeVideoPlaceholder(frame.id, item);
           } else {
             const video = document.createElement('video');
             video.setAttribute('controls','');
@@ -844,12 +878,29 @@
             video.setAttribute('playsinline','');
             video.setAttribute('controlslist','nodownload noremoteplayback');
             if (item.poster) video.setAttribute('poster', item.poster);
-            hookVideoToPauseBgm(video);
+
+            // sources
             (item.sources || []).forEach(s=>{
               const src = document.createElement('source');
-              src.src = s.src; if (s.type) s.type;
+              src.src = s.src; if (s.type) src.type = s.type;
               video.appendChild(src);
             });
+
+            // captions / subtitles (NEW)
+            (item.tracks || []).forEach(t=>{
+              const track = document.createElement('track');
+              track.kind = 'subtitles';
+              track.src = t.src; track.srclang = t.srclang; track.label = t.label;
+              if (t.default) track.default = true;
+              video.appendChild(track);
+            });
+
+            // hook background music pause
+            hookVideoToPauseBgm(video);
+
+            // If this is Video 5, prep for deep-link autoplay
+            if (i === 4) video.id = 'video5';
+
             video.appendChild(document.createTextNode("Sorry, your browser can’t play this video."));
             frame.appendChild(video);
             card.appendChild(meta);
@@ -859,15 +910,32 @@
         });
       }
 
-      // 🔧 Do NOT touch mananayFrame or thenNowVideoFrame (they are YouTube iframes now)
+      // Keep birthday section behavior the same
       if (shouldReduceEffects()) {
-        // makeVideoPlaceholder('mananayFrame', MANANAY_VIDEO);   // removed
-        // makeVideoPlaceholder('thenNowVideoFrame', THEN_NOW_VIDEO); // removed
         makeVideoPlaceholder('birthdayFrame', BIRTHDAY_VIDEO);
       } else {
-        // renderVideoInto('mananayFrame', MANANAY_VIDEO);        // removed
-        // renderVideoInto('thenNowVideoFrame', THEN_NOW_VIDEO);  // removed
         renderVideoInto('birthdayFrame', BIRTHDAY_VIDEO);
+      }
+
+      // 🔗 Deep link: ?v=5 → scroll to Video 5 and play
+      const params = new URLSearchParams(location.search);
+      if (params.get('v') === '5') {
+        // If reduced mode used placeholders, force-render the real player for #5
+        const frame = document.getElementById('video-frame-4');
+        if (frame && frame.querySelector('.video-placeholder')) {
+          renderVideoInto(frame, VIDEOS[4]); // render real <video> with tracks
+        }
+
+        const targetVideo = document.getElementById('video5') || (frame && frame.querySelector('video'));
+        const targetCard  = document.querySelector('.video-card.highlight');
+
+        if (targetCard) targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        if (targetVideo) {
+          // try to play muted (most browsers allow this without user gesture)
+          targetVideo.muted = true;
+          targetVideo.play().catch(()=>{ /* user can tap play if blocked */ });
+        }
       }
     })();
 
@@ -923,4 +991,3 @@
   </script>
 </body>
 </html>
-
