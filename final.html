@@ -98,7 +98,6 @@
     .confetti { position: fixed; width: 10px; height: 10px; background: #fff; top: var(--y); left: var(--x); transform: translate(-50%, -50%) rotate(var(--rot)); opacity: .95; border-radius: 2px; animation: confetti-fall var(--t) cubic-bezier(.2,.8,.2,1) forwards; }
     @keyframes confetti-fall { to { transform: translate(-50%, calc(-50% + 120vh)) rotate(calc(var(--rot) + 360deg)); opacity: .9; } }
     .sparkle { position: fixed; width: 6px; height: 6px; border-radius: 50%; background: radial-gradient(circle, #fff, rgba(255,255,255,0)); top: var(--y); left: var(--x); transform: translate(-50%,-50%); animation: sparkle-pop .8s ease-out forwards; filter: drop-shadow(0 0 10px #fff); }
-    @keyframes sparkle-pop { 0% { transform: translate(-50%,-50%) scale(.2); opacity: 0; } 70% { opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1.8); opacity: 0; } }
 
     footer { text-align: center; color: #1f2937; padding: 30px 0 60px; font-size: 14px; opacity: .9; }
 
@@ -314,8 +313,10 @@
     </section>
 
     <section id="letter">
+      <!-- ✏️ To change the heading text, edit between the <h2>…</h2> tags below -->
       <h2>UMMM Apkai liye kuch baatay</h2>
       <div class="letter" id="letterBody">
+        <!-- ✏️ Add more paragraphs by inserting additional <p>…</p> blocks inside this #letterBody div -->
         <p>so by now apnay sari videos dekhlee hongi, </p>
         <p class="signature">With all my love, — Your Name</p>
       </div>
@@ -360,7 +361,8 @@
       }
     ];
     const MANANAY_VIDEO = { poster: "media/posters.jpg", sources: [ { src: "media/Mananay.mp4", type: "video/mp4" } ] };
-    const BIRTHDAY_VIDEO = { poster: "media/posters.jpg", sources: [ { src: "media/birthday.mp4", type: "video/mp4" } ] };
+    // 🔗 New: YouTube Shorts ID for the Birthday video
+    const BIRTHDAY_YT_ID = "Bwlgpi1wlnA";
     const THEN_NOW_VIDEO = { poster: "media/posters.jpg", sources: [ { src: "media/Timeline.mp4", type: "video/mp4" } ] };
 
     /* ✍️ Edit these to set the message inside each gift (1→first, 2→second, etc.) */
@@ -828,6 +830,36 @@
       frame.appendChild(btn);
     }
 
+    // ⭐ New: YouTube placeholder that uses a custom poster, then swaps to the iframe on click
+    function renderYouTubeWithPlaceholder(containerId, youtubeId, poster){
+      const frame = document.getElementById(containerId);
+      if (!frame) return;
+      frame.innerHTML = '';
+      const btn = document.createElement('button');
+      btn.className = 'video-placeholder';
+      btn.style.width = '100%';
+      btn.style.height = '100%';
+      btn.style.border = 0;
+      btn.style.background = `url("${poster}") center/cover no-repeat #f3f4f6`;
+      btn.style.display = 'grid';
+      btn.style.placeItems = 'center';
+      btn.innerHTML = `<div style="backdrop-filter: blur(4px);padding:12px;border-radius:10px;font-weight:700">▶ Play</div>`;
+      btn.addEventListener('click', () => {
+        const iframe = document.createElement('iframe');
+        iframe.src = `https://www.youtube.com/embed/${youtubeId}?rel=0&modestbranding=1&playsinline=1&autoplay=1`;
+        iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+        iframe.allowFullscreen = true;
+        iframe.loading = "lazy";
+        iframe.style.width = "100%";
+        iframe.style.height = "100%";
+        iframe.style.border = "0";
+        frame.innerHTML = '';
+        frame.appendChild(iframe);
+        pauseBgm();
+      });
+      frame.appendChild(btn);
+    }
+
     function wireImage(id, path){
       const img = document.getElementById(id);
       if (!img) return;
@@ -906,12 +938,8 @@
         });
       }
 
-      // Keep birthday section behavior the same
-      if (shouldReduceEffects()) {
-        makeVideoPlaceholder('birthdayFrame', BIRTHDAY_VIDEO);
-      } else {
-        renderVideoInto('birthdayFrame', BIRTHDAY_VIDEO);
-      }
+      // ⭐ Birthday section now uses YouTube Shorts with a poster-matched placeholder
+      renderYouTubeWithPlaceholder('birthdayFrame', BIRTHDAY_YT_ID, 'media/posters.jpg');
 
       // 🔗 Deep link: ?v=5 → scroll to Video 5 and play
       const params = new URLSearchParams(location.search);
@@ -963,6 +991,26 @@
       function tick(){ ctx.clearRect(0,0,W,H); for(let i=parts.length-1;i>=0;i--){ const p=parts[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.03; p.life--; ctx.fillStyle=p.color; ctx.globalAlpha=Math.max(0,p.life/80); ctx.fillRect(p.x,p.y,2,2); if(p.life<=0) parts.splice(i,1);} requestAnimationFrame(tick);} 
       if (!shouldReduceEffects()) { tick(); }
       let fired=false; window.addEventListener('scroll',()=>{ if(fired) return; if(window.scrollY + window.innerHeight > document.body.scrollHeight - 120){ fired=true; for(let k=0;k<5;k++) setTimeout(()=>boom(W/2, H*0.3 + Math.random()*H*0.2), k*400); }}); window._boom = boom;
+    })();
+
+    /* ===== Append your long message at the end of the letter ===== */
+    (function addExtraLetter(){
+      const letterBody = document.getElementById('letterBody');
+      if (!letterBody) return;
+      const extraMessage = `yaar dekho i thought of writing a huge message for you lekin sachi baat batao tu mujhey yeh feel hoaa kai app bhot ziyada naraz ho meray say kio kai apnay seen zone kia waa tu ummm mainay phir decide kiaa, msg achaa saa ap mann jaogi phir likhogaa, abhi bss kuch small baatay likh rha bs
+happy birthday bhott ziyada khush rahoo and celebrate your day...har bari 18 saal ka naye honaa tu jitna hosakay enjoy karna ajj ka din, apnaa dehan rakha karo bhott ziyadaaaa and make your parents proud alot....the only romantic/pyari thing i am going to say is that kai meray debit card ka jo pin number hai thats 1031 which is your birthday where 10 is October and 31 is the day........abbb app khud hi bss dekhloo aur kuch naye bolna mainay...baqi yeahh agar bata sako kai acha laga tu batana warna its alright nigga
+.
+.
+.
+.
+.
+.
+.
+Okay so above msg was the last thing i tried which might have made you less naraz....abb now agar app still angry hai yaha tk...tu ummm its alright...aur please barhaye karam agar naraz hai tu naraz rahiyega bila wajah acting naa kijeyayga shukriyaa...baqi i would try my best kai app mann jaoo tu yeahh cutest (: `;
+      const p = document.createElement('p');
+      p.style.whiteSpace = 'pre-wrap';
+      p.textContent = extraMessage;
+      letterBody.appendChild(p);
     })();
 
     /* ===== Visibility / Background pause & cleanup ===== */
